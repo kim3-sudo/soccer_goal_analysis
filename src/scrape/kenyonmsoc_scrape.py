@@ -24,6 +24,11 @@ for line in text:
     print(line)
     url_list.append(line)
 
+print('Cleaning url list')
+for i in url_list:
+    if (i == ''):
+        url_list.remove(i)
+
 df = pd.DataFrame()
 
 for url in tqdm(url_list):

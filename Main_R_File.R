@@ -1,3 +1,7 @@
+### Soccer Goal Analysis
+### Josh Katz & Sejin Kim
+### STAT 306 S21 @ Kenyon College
+
 ### This will contain some R code as we analyze goal scoring data over the last x years for Manchester United and Columbus Crew
 library(mosaic)
 library(tidyverse)

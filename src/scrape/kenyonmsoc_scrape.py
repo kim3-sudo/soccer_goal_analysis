@@ -6,9 +6,9 @@ Created on Tue Apr  6 18:42:37 2021
 """
 
 import pandas as pd
+import re
 import requests
 from tqdm import tqdm
-from bs4 import BeautifulSoup
 from datetime import datetime
 
 now = datetime.now()
@@ -16,55 +16,89 @@ dt_string = now.strftime("_%d%m%Y_%H%M%S")
 enddir = 'D:\\development\\'
 endfile = enddir + 'ka_scrape' + dt_string + '.csv'
 
-print('Attempting to scrape')
+url_list = []
+url_file = 'https://raw.githubusercontent.com/kim3-sudo/soccer_goal_analysis/main/src/scrape/sources.txt'
+src_file = requests.get(url_file)
+text = src_file.text.split("\n")
+for line in text:
+    print(line)
+    url_list.append(line)
 
-games = pd.read_csv('D:\\development\\scratch\\2016_MSOC.csv')
-games_df = games['url']
-for i in tqdm(games_df):
-    time.sleep(1.0)
-    url = i
-    data = requests.get(url)
-    soup = BeautifulSoup(data.text, 'lxml')
-    
-    goal_table = soup.find("table", attrs = {'class': 'overall-stats'})
-    times = goal_table.find_all("th", attrs = {'scope': 'row'})
-    scorer = goal_table.find_all("span", attrs = {'class': 'text-bold'})
-    assist = goal_table.find_all("span", attrs = {'class': 'text-italic'})
-    method = goal_table.find_all("span", attrs = {'class': 'text-capitalize'})
-    
-    times_list = []
-    for i in tqdm(times):
-        result = i.text.strip()
-        times_list.append(result)
-        
-    scorer_list = []
-    for i in tqdm(scorer):
-        result = i.text.strip()
-        scorer_list.append(result)
-        
-    assist_list = []
-    for i in tqdm(assist):
-        result = i.text.strip()
-        assist_list.append(result)
-    
-    method_list = []
-    for i in tqdm(method):
-        result = i.text.strip()
-        method_list.append(result)
-        
-    df = pd.DataFrame()
-    
-    df['times'] = times_list
-    df['scorer'] = scorer_list
-    df['assist'] = assist_list
-    df['method'] = method_list
-    
-    print('Generating CSV output')
+print('Cleaning url list')
+for i in url_list:
+    if (i == ''):
+        url_list.remove(i)
+
+df = pd.DataFrame()
+
+for url in tqdm(url_list):
+    dfs = pd.read_html(url, header=0)
+    playdf = dfs[1].head()
+    playerList = []
+    goalnoList = []
+    assistList = []
+    playtyList = []
+    for index,row in playdf.iterrows():
+        try:
+            player = re.findall(r'.{3,} \(', row['Description'])[0]
+            player = player[:-2]
+            playerList.append(player)
+        except:
+            print('Could not get player')
+
+        try:
+            goalno = re.findall(r'(\d)', row['Description'])[0]
+            goalnoList.append(goalno)
+        except:
+            print('Could not get goalno')
+
+        try:
+            assist = re.findall(r'Assisted\sBy:\s.{3,}\s\s', row['Description'])[0]
+            assist = assist.lstrip('Assisted By: ')
+            assist = assist.rstrip(' ')
+            assistList.append(assist)
+        except:
+            print('No assist data.')
+            assistList.append('')
+
+        try:
+            playty = re.findall(r'\w\s\s.{3,}', row['Description'])[0]
+            playty = playty[3:]
+            playtyList.append(playty)
+        except:
+            try:
+                playty = re.findall(r'\)\s\s.{3,}', row['Description'])[0]
+                playty = playty[3:]
+                playtyList.append(playty)
+            except:
+                playtyList.append('PK')
+
+    print('Trying to append playerList')
     try:
-        with open(endfile, 'a') as f:
-            df.to_csv(endfile, header = None, line_terminator = '\n')
-    except Exception as e:
-        print('Scrape failure')
-        print('Failed with code:', str(e))
+        playdf['Player'] = playerList
+    except:
+        pass
 
+    print('Trying to append goalnoList')
+    try:
+        playdf['GoalNo'] = goalnoList
+    except:
+        pass
+
+    print('Trying to append assistList')
+    try:
+        playdf['Assist'] = assistList
+    except:
+        pass
+
+    print('Trying to append playtyList')
+    try:
+        playdf['PlayType'] = playtyList
+    except:
+        pass
+
+    df = df.append(playdf, ignore_index=True)
+
+print(df)
+df.to_csv(endfile)
 print('All done!')
